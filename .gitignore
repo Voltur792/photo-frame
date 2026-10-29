@@ -1,9 +1,0 @@
-.venv/
-.tmp-*/
-__pycache__/
-*.astraplugin
-AGENTS.md
-data/
-.locales-tmp/
-
-.pytest_cache/
