@@ -1,0 +1,24 @@
+[plugin]
+id = "photo-frame"
+name = "Photo Frame"
+version = "0.1.0"
+description = "A resizable photo frame on the Astra desktop: shows a photo folder as an animated slideshow with frame styles, captions and timed slides."
+author = "Voltur"
+license = "MIT"
+min_astra_version = "0.2.7"
+
+[entry]
+command = "python"
+args = ["-m", "src.plugin"]
+cwd = "."
+runtimes = ["python"]
+
+[capabilities]
+ui_contributions = true
+
+[config]
+schema = "{ \"type\": \"object\", \"properties\": {} }"
+
+[platform]
+os = ["windows", "linux", "macos"]
+arch = ["x86_64"]

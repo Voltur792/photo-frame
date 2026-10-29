@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <script src="http://astra-plugin.localhost/bridge/astra-bridge.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Настройки фоторамки</title>
+  <style>
+    :root {
+      color-scheme: normal;
+      --text: var(--color-text, #f7f6ff);
+      --muted: var(--color-text-muted, #89869b);
+      --stroke: var(--color-border, rgba(255,255,255,.14));
+      --accent: var(--color-accent, #8b5cf6);
+      --surface: color-mix(in srgb, var(--text) 14%, transparent);
+      --raised: color-mix(in srgb, var(--text) 26%, transparent);
+      --font: var(--font-sans, 'Segoe UI', system-ui, sans-serif);
+      --radius: 10px;
+    }
+    body { color-scheme: light dark; }
+    html, body { background: transparent; margin: 0; width: 100%; height: 100%; }
+    * { box-sizing: border-box; }
+    body { font-family: var(--font); color: var(--text); }
+    .wrap { padding: 14px 16px 20px; display: flex; flex-direction: column; gap: 12px;
+      max-width: 660px; margin: 0 auto; }
+    h1 { font-size: 15px; margin: 2px 0 0; }
+    .card { border: 1px solid var(--stroke); border-radius: 12px; padding: 10px 12px;
+      display: flex; flex-direction: column; gap: 10px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .row .lb { font-size: 13px; }
+    .hint { font-size: 11.5px; color: var(--muted); }
+    input[type=text] { background: var(--surface); color: var(--text); border: 1px solid var(--stroke);
+      border-radius: 8px; padding: 7px 9px; font: inherit; font-size: 13px; width: 100%; }
+    input[type=number] { background: var(--surface); color: var(--text); border: 1px solid var(--stroke);
+      border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; width: 88px; text-align: right; }
+    /* собственные контролы вместо наттивных — чтобы не было «щелкающих» системных пунктов */
+    .seg { display: flex; border: 1px solid var(--stroke); border-radius: var(--radius);
+      overflow: hidden; background: var(--surface); }
+    .seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px;
+      padding: 7px 10px; cursor: pointer; white-space: nowrap; }
+    .seg button.on { background: color-mix(in srgb, var(--accent) 26%, transparent);
+      color: var(--text); font-weight: 600; }
+    .seg button:hover { color: var(--text); }
+    .sw { position: relative; width: 40px; height: 22px; border-radius: 11px; cursor: pointer;
+      background: var(--surface); border: 1px solid var(--stroke); transition: background .15s; flex: none; }
+    .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+      border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+    .sw[aria-checked=true] { background: color-mix(in srgb, var(--accent) 55%, transparent);
+      border-color: transparent; }
+    .sw[aria-checked=true]::after { transform: translateX(18px); background: #fff; }
+    input[type=range] { flex: 1; accent-color: var(--accent); height: 22px; }
+    .rangeval { font-size: 12px; color: var(--muted); width: 34px; text-align: right; }
+    .fold { display: flex; flex-direction: column; gap: 6px; }
+    .frow { display: flex; align-items: center; gap: 6px; }
+    .frow .fpath { flex: 1; min-width: 0; font-size: 12.5px; }
+    .frow .fbtn { border: 1px solid var(--stroke); background: var(--surface); color: var(--text);
+      border-radius: 8px; padding: 5px 8px; font-size: 13px; cursor: pointer; }
+    .frow .fbtn:hover { border-color: var(--accent); }
+    .frow .fmove { display: flex; flex-direction: column; gap: 2px; }
+    .frow .fmove .fbtn { padding: 1px 7px; font-size: 11px; line-height: 1.2; }
+    .addrow { display: flex; gap: 8px; }
+    .addbtn { border: 1px solid var(--stroke); background: var(--raised); color: var(--text);
+      border-radius: 8px; padding: 7px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
+    .addbtn:hover { border-color: var(--accent); }
+    #status { font-size: 12.5px; color: var(--muted); min-height: 16px; }
+    #status.err { color: #f2a3a3; }
+    #status.okc { color: #8ee6a0; }
+    .note { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🖼 Фоторамка</h1>
+
+    <div class="card">
+      <div class="lb" style="font-size:13px;">Папки с фото и видео</div>
+      <div class="hint">Рамка показывает содержимое всех выбранных папок: снимки, анимированные gif, видео mp4/webm.</div>
+      <div class="fold" id="folds"></div>
+      <div class="addrow">
+        <button id="pickBtn" class="addbtn">📁 Выбрать папку…</button>
+        <button id="manualBtn" class="addbtn">Ввести путь вручную</button>
+        <span style="flex:1"></span>
+        <button id="check" class="addbtn">Проверить</button>
+      </div>
+      <div id="status"></div>
+    </div>
+
+    <div class="card">
+      <div class="row"><span class="lb">Искать в подпапках</span><span class="sw" id="recursive" role="switch" tabindex="0"></span></div>
+      <div class="row"><span class="lb">Перемешивать снимки</span><span class="sw" id="shuffle" role="switch" tabindex="0"></span></div>
+      <div class="row">
+        <span class="lb">Менять кадр каждые, сек</span>
+        <input id="interval" type="number" min="2" max="3600" step="1">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="lb" style="font-size:13px;">Смена кадра</div>
+      <div class="seg" id="transition"></div>
+      <div class="lb" style="font-size:13px;">Компоновка кадра</div>
+      <div class="seg" id="fit"></div>
+      <div class="lb" style="font-size:13px;">Поведение видео</div>
+      <div class="seg" id="video_mode"></div>
+    </div>
+
+    <div class="card">
+      <div class="lb" style="font-size:13px;">Стиль подложки</div>
+      <div class="seg" id="frame"></div>
+      <div class="row">
+        <span class="lb">Поле подложки</span>
+        <input id="padding" type="range" min="0" max="80" step="1">
+        <span class="rangeval" id="paddingv">14</span>
+      </div>
+      <div class="row">
+        <span class="lb">Скругление углов</span>
+        <input id="radius" type="range" min="0" max="48" step="1">
+        <span class="rangeval" id="radiusv">10</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="lb" style="font-size:13px;">Подпись</div>
+      <div class="seg" id="caption"></div>
+    </div>
+
+    <p class="note">Размер рамки меняется перетаскиванием плитки на рабочем столе Astra.
+      У каждой копии рамки — свой набор папок и настроек; для нескольких разных
+      рамок добавьте на стол несколько плиток. Значения применяются сразу.</p>
+  </div>
+  <script>
+    "use strict";
+    const $ = id => document.getElementById(id);
+    const OPTIONS = {
+      transition: [['fade', 'Плавно'], ['slide', 'Слайд'], ['kenburns', 'Зум и панорама'], ['none', 'Без анимации']],
+      fit: [['contain', 'Целым'], ['cover', 'Заполняя'], ],
+      video_mode: [['once', 'Проигрывать один раз'], ['loop', 'По кругу']],
+      frame: [['glass', 'Стекло'], ['transparent', 'Без подложки'], ['dark', 'Тёмная'], ['white', 'Белая'], ['gallery', 'Галерея']],
+      caption: [['none', 'Нет'], ['name', 'Имя файла'], ['date', 'Дата'], ['clock', 'Часы']],
+    };
+    let hostConfig = {}, pending = new Map(), editVersion = 0, acknowledgedVersion = 0;
+    let ctx = { preview: false }, pickTimer = null;
+
+    function cfgValue() {
+      const result = { ...hostConfig };
+      for (const [key, edit] of pending) result[key] = edit.value;
+      return result;
+    }
+
+    function current() { return cfgValue(); }
+
+    function commit(key, value) {
+      if (ctx.preview) return Promise.resolve();
+      const version = ++editVersion;
+      pending.set(key, { value, version });
+      const replacement = cfgValue(), sent = new Map(pending);
+      repaint(replacement);
+      return window.astra.widget.setConfig(replacement).then(() => {
+        if (version >= acknowledgedVersion) hostConfig = { ...replacement };
+        acknowledgedVersion = Math.max(acknowledgedVersion, version);
+        for (const [field, edit] of sent)
+          if (pending.get(field)?.version === edit.version) pending.delete(field);
+      }, () => {
+        if (pending.get(key)?.version === version) pending.delete(key);
+        repaint(cfgValue());
+      });
+    }
+    function buildSeg(key) {
+      const box = $(key);
+      box.innerHTML = '';
+      for (const [value, label] of OPTIONS[key]) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.dataset.v = value; b.textContent = label;
+        b.addEventListener('click', () => commit(key, value));
+        box.appendChild(b);
+      }
+    }
+    function foldersOf(c) {
+      const list = Array.isArray(c.folders) ? c.folders : (c.folder ? [c.folder] : []);
+      return list.filter(x => typeof x === 'string' && x.trim());
+    }
+
+    function renderFolders(c) {
+      const box = $('folds');
+      const folders = foldersOf(c);
+      box.innerHTML = '';
+      folders.forEach((path, i) => {
+        const row = document.createElement('div');
+        row.className = 'frow';
+        const input = document.createElement('input');
+        input.className = 'fpath'; input.value = path; input.disabled = ctx.preview;
+        input.addEventListener('change', () => {
+          const next = foldersOf(current()).map((p, j) => j === i ? input.value.trim() : p)
+            .filter(x => x);
+          commit('folders', next);
+        });
+        const move = document.createElement('span');
+        move.className = 'fmove';
+        const up = document.createElement('button');
+        up.className = 'fbtn'; up.textContent = '↑'; up.title = 'Выше'; up.disabled = ctx.preview || i === 0;
+        up.addEventListener('click', () => {
+          const next = foldersOf(current());
+          [next[i - 1], next[i]] = [next[i], next[i - 1]];
+          commit('folders', next);
+        });
+        const down = document.createElement('button');
+        down.className = 'fbtn'; down.textContent = '↓'; down.title = 'Ниже'; down.disabled = ctx.preview || i === folders.length - 1;
+        down.addEventListener('click', () => {
+          const next = foldersOf(current());
+          [next[i + 1], next[i]] = [next[i], next[i + 1]];
+          commit('folders', next);
+        });
+        move.append(up, down);
+        const del = document.createElement('button');
+        del.className = 'fbtn'; del.textContent = '✕'; del.title = 'Убрать папку'; del.disabled = ctx.preview;
+        del.addEventListener('click', () => commit('folders', foldersOf(current()).filter((_, j) => j !== i)));
+        row.append(input, move, del);
+        box.appendChild(row);
+      });
+      const hint = document.createElement('div');
+      hint.className = 'hint';
+      hint.textContent = folders.length ? `Папок в рамке: ${folders.length}` : 'Папок пока нет — добавьте хотя бы одну';
+      box.appendChild(hint);
+    }
+
+    function addFolderManual() {
+      const next = [...foldersOf(current()), ''];
+      commit('folders', next).then(() => {
+        const rows = $('folds').querySelectorAll('.frow input');
+        if (rows.length) rows[rows.length - 1].focus();
+      });
+    }
+    function wireSwitch(id, key) {
+      const el = $(id);
+      const toggle = () => { if (!ctx.preview) commit(key, el.getAttribute('aria-checked') !== 'true'); };
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
+    }
+    function wireRange(id, key) {
+      $(id).addEventListener('input', () => { $(id + 'v').textContent = $(id).value; });
+      $(id).addEventListener('change', () => commit(key, Number($(id).value) || 0));
+    }
+
+    function repaint(c) {
+      for (const key of Object.keys(OPTIONS)) {
+        const chosen = String(c[key] ?? (key === 'video_mode' ? 'once' : key === 'fit' ? 'contain' : 'none'));
+        for (const b of $(key).querySelectorAll('button'))
+          b.classList.toggle('on', b.dataset.v === chosen);
+      }
+      renderFolders(c);
+      $('recursive').setAttribute('aria-checked', String(c.recursive) === 'true');
+      $('shuffle').setAttribute('aria-checked', String(c.shuffle) === 'true');
+      $('interval').value = Number(c.interval ?? 10);
+      $('padding').value = Number(c.padding ?? 14); $('paddingv').textContent = $('padding').value;
+      $('radius').value = Number(c.radius ?? 10); $('radiusv').textContent = $('radius').value;
+    }
+
+    function setStatus(text, cls) { const s = $('status'); s.textContent = text; s.className = cls || ''; }
+
+    async function checkFolders() {
+      if (ctx.preview) return;
+      setStatus('Проверяю папки…');
+      try {
+        const r = await window.astra.callBackend('pf_state',
+          { refresh: true, folders: foldersOf(current()).map(x => x || ''), recursive: $('recursive').getAttribute('aria-checked') === 'true' });
+        if (r && r.ok) {
+          setStatus(r.count ? `Кадров в рамке: ${r.count} (фото, видео, анимации)` :
+            'В этих папках нет подходящих файлов (фото/видео/gif).', r.count ? 'okc' : 'err');
+        } else { setStatus((r && r.err) || 'Папки недоступны', 'err'); }
+      } catch (e) { setStatus(String(e.message || e), 'err'); }
+    }
+    async function startPick() {
+      if (ctx.preview) return;
+      setStatus('Открываю диалог выбора папки…');
+      try {
+        const known = foldersOf(current()).filter(Boolean);
+        await window.astra.callBackend('pf_pick', { prefill: known[known.length - 1] || '' });
+        if (pickTimer) return;
+        pickTimer = setInterval(async () => {
+          try {
+            const r = await window.astra.callBackend('pf_pick_result', {});
+            if (r && r.status === 'done') {
+              clearInterval(pickTimer); pickTimer = null;
+              if (r.path) {
+                const next = [...new Set([...foldersOf(current()), r.path])];
+                commit('folders', next);
+                setStatus(`Добавлена папка: ${r.path}`, 'okc');
+              } else if (r.err) { setStatus(r.err, 'err'); }
+              else setStatus('');
+            }
+          } catch (e) { /* мост моргает — продолжим опрос */ }
+        }, 700);
+      } catch (e) { setStatus('Не удалось открыть диалог: ' + String(e.message || e), 'err'); }
+    }
+
+    async function boot() {
+      ctx = await window.astra.widget.getContext();
+      hostConfig = { ...ctx.config };
+      if (ctx.preview) document.querySelectorAll('button,input,select,textarea').forEach(x => x.disabled = true);
+      ['transition', 'fit', 'video_mode', 'frame', 'caption'].forEach(buildSeg);
+      wireSwitch('recursive', 'recursive');
+      wireSwitch('shuffle', 'shuffle');
+      wireRange('padding', 'padding');
+      wireRange('radius', 'radius');
+      $('pickBtn').addEventListener('click', startPick);
+      $('manualBtn').addEventListener('click', addFolderManual);
+      $('check').addEventListener('click', checkFolders);
+      $('interval').addEventListener('change', () => {
+        let v = Number($('interval').value);
+        if (!(v >= 2 && v <= 3600)) v = 10;
+        $('interval').value = v; commit('interval', v);
+      });
+      repaint(cfgValue());
+      window.astra.widget.onContextChange(next => {
+        ctx = next;
+        hostConfig = { ...next.config };
+        if (!pending.size) repaint(cfgValue());
+      });
+    }
+
+    boot();
+  </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+astra-plugin-sdk>=0.6.4,<0.7
+Pillow>=11.3,<13
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.0
